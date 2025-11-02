@@ -1,0 +1,43 @@
+name: Weekly Fantasy Score Automation
+
+on:
+  schedule:
+    - cron: "0 10 * * MON"  # runs every Monday at 10:00 UTC
+  workflow_dispatch:         # lets you run it manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest   # GitHub provides a temporary Linux server for your job
+
+    steps:
+      # Step 1 — Download your current repo (fantasy-automation)
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      # Step 2 — Clone your fork of the scoring app
+      # ⚠️ Replace <your-username> below with your actual GitHub username
+      - name: Clone HFW-App fork
+        run: git clone https://github.com/<your-username>/HFW-App.git
+
+      # Step 3 — Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Step 4 — Install Python dependencies
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 pandas
+
+      # Step 5 — Run your main automation script
+      - name: Run automation
+        run: python automate_scores.py
+
+      # Step 6 — Commit and push the output CSVs back to GitHub
+      - name: Commit and push results
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add Matchweek_*.csv
+          git commit -m "Add results for latest matchweek" || echo "No changes to commit"
+          git push
