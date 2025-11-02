@@ -17,7 +17,7 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v4
         with:
-          persist-credentials: false  # we'll use the provided GITHUB_TOKEN explicitly
+          persist-credentials: false  # use GITHUB_TOKEN explicitly for pushing
 
       # Step 2 — Clone your fork of the scoring app
       - name: Clone HFW-App fork
@@ -29,4 +29,28 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Step 4 — Install
+      # Step 4 — Install Python dependencies
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 pandas
+
+      # Step 5 — Run your automation script
+      # '|| true' ensures the workflow continues even if script exits cleanly
+      - name: Run automation
+        run: python automate_scores.py || true
+
+      # Step 6 — Commit and push CSV results
+      - name: Commit and push results
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Add any new weekly CSVs
+          git add Matchweek_*.csv || true
+          
+          # Commit only if there are changes
+          git diff --cached --quiet || git commit -m "Add results for latest matchweek"
+          
+          # Push back to the same branch
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" HEAD:${{ github.ref }}
