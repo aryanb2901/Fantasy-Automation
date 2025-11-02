@@ -9,22 +9,20 @@ FBREF_URL = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fix
 HFW_REPO = "HFW-App"      # folder name after cloning your fork
 OUTPUT_DIR = "weekly_scores"
 
-# --- ABSTRACT API FETCH FUNCTION ---
-def fetch_via_abstractapi(url):
-    """Fetch URL content using AbstractAPI to bypass Cloudflare blocking."""
-    api_key = os.getenv("ABSTRACT_API_KEY")
-    if not api_key:
-        raise ValueError("ABSTRACT_API_KEY not set in environment variables.")
-    proxy_url = f"https://scrape.abstractapi.com/v1/?api_key={api_key}&url={url}"
-    print(f"Fetching via AbstractAPI: {url}")
-    resp = requests.get(proxy_url)
-    print(f"Status Code: {resp.status_code}")
-    return resp
-
 # --- CORE FUNCTIONS ---
+
 def get_latest_completed_week():
     """Return the most recent completed Premier League matchweek number."""
-    resp = fetch_via_abstractapi(FBREF_URL)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0.0.0 Safari/537.36"
+        )
+    }
+
+    print(f"Fetching schedule page from {FBREF_URL}")
+    resp = requests.get(FBREF_URL, headers=headers)
     if resp.status_code != 200:
         print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
         return None
@@ -49,9 +47,18 @@ def get_latest_completed_week():
     print(f"Latest completed week detected: {latest}")
     return latest
 
+
 def get_premier_league_links_by_week(target_week):
     """Return all Match Report links for a specific Premier League week."""
-    resp = fetch_via_abstractapi(FBREF_URL)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0.0.0 Safari/537.36"
+        )
+    }
+
+    resp = requests.get(FBREF_URL, headers=headers)
     if resp.status_code != 200:
         print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
         return []
@@ -80,6 +87,7 @@ def get_premier_league_links_by_week(target_week):
     print(f"Found {len(links)} match reports for Week {target_week}")
     return links
 
+
 def run_match(link, idx):
     """Run scoring.py for a single match."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -92,6 +100,7 @@ def run_match(link, idx):
     )
     return os.path.join(HFW_REPO, output_file)
 
+
 def combine_results(csv_paths, out_name):
     """Combine all match CSVs into a single file."""
     dfs = [pd.read_csv(p) for p in csv_paths if os.path.exists(p)]
@@ -101,6 +110,7 @@ def combine_results(csv_paths, out_name):
     combined = pd.concat(dfs, ignore_index=True)
     combined.to_csv(out_name, index=False)
     return out_name
+
 
 # --- MAIN WORKFLOW ---
 if __name__ == "__main__":
