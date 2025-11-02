@@ -11,12 +11,17 @@ OUTPUT_DIR = "weekly_scores"
 
 def get_last_saturday():
     today = date.today()
-    offset = (today.weekday() + 2) % 7
+    offset = (today.weekday() + 2) % 7  # Saturday = 5
     return today - timedelta(days=offset)
 
 def get_premier_league_links(fbref_date):
     url = f"{FBREF_BASE}/{fbref_date.strftime('%Y-%m-%d')}"
+    print(f"Fetching matches from {url}")
     resp = requests.get(url)
+    if resp.status_code != 200:
+        print(f"⚠️ Failed to load page for {fbref_date}, status {resp.status_code}")
+        return []
+
     soup = BeautifulSoup(resp.text, "html.parser")
     links = []
     for row in soup.select("table#sched_all tr"):
@@ -31,6 +36,7 @@ def get_premier_league_links(fbref_date):
 def run_match(link, idx):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_file = os.path.join(OUTPUT_DIR, f"match_{idx}.csv")
+    print(f"→ Running scoring.py for {link}")
     subprocess.run(
         ["python3", "scoring.py", link, output_file],
         cwd=HFW_REPO,
@@ -46,9 +52,17 @@ def combine_results(csv_paths, out_name):
 
 if __name__ == "__main__":
     saturday = get_last_saturday()
-    match_links = get_premier_league_links(saturday)
+    sunday = saturday + timedelta(days=1)
 
-    print(f"Found {len(match_links)} Premier League matches")
+    # Collect Saturday + Sunday matches
+    match_links = get_premier_league_links(saturday)
+    match_links += get_premier_league_links(sunday)
+
+    print(f"\nFound {len(match_links)} Premier League matches")
+
+    if not match_links:
+        print("⚠️ No Premier League matches found — skipping CSV creation.")
+        exit(0)
 
     csvs = []
     for i, link in enumerate(match_links):
