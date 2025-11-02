@@ -1,46 +1,93 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from datetime import date, timedelta
 import subprocess
 import os
+from datetime import date
+from datetime import timedelta
 
-FBREF_BASE = "https://fbref.com/en/matches"
-HFW_REPO = "HFW-App"  # folder name after cloning your fork
+# --- CONFIGURATION ---
+FBREF_URL = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
+HFW_REPO = "HFW-App"      # folder name after cloning your fork
 OUTPUT_DIR = "weekly_scores"
 
-def get_last_saturday():
-    today = date.today()
-    offset = (today.weekday() + 2) % 7  # Saturday = 5
-    return today - timedelta(days=offset)
+# --- UTILITY FUNCTIONS ---
 
-def get_premier_league_links(fbref_date):
-    url = f"{FBREF_BASE}/{fbref_date.strftime('%Y-%m-%d')}"
-    print(f"Fetching matches from {url}")
+def get_latest_completed_week():
+    """Return the most recent completed Premier League matchweek number."""
     headers = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/118.0.0.0 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0.0.0 Safari/537.36"
         )
     }
-    resp = requests.get(url, headers=headers)
+    print(f"Fetching schedule page from {FBREF_URL}")
+    resp = requests.get(FBREF_URL, headers=headers)
     if resp.status_code != 200:
-        print(f"⚠️ Failed to load page for {fbref_date}, status {resp.status_code}")
+        print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
+        return None
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    table = soup.find("table", {"id": "sched_ks_9_2025"}) or soup.find("table", {"id": "sched_all"})
+    if not table:
+        print("⚠️ Could not find schedule table.")
+        return None
+
+    weeks = set()
+    for row in table.find_all("tr"):
+        wk = row.find("td", {"data-stat": "week"})
+        score = row.find("td", {"data-stat": "score"})
+        if wk and score and score.text.strip():
+            try:
+                weeks.add(int(wk.text.strip()))
+            except ValueError:
+                continue
+
+    latest = max(weeks) if weeks else None
+    print(f"Latest completed week detected: {latest}")
+    return latest
+
+def get_premier_league_links_by_week(target_week):
+    """Return all Match Report links for a specific Premier League week."""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/118.0.0.0 Safari/537.36"
+        )
+    }
+    resp = requests.get(FBREF_URL, headers=headers)
+    if resp.status_code != 200:
+        print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
+    table = soup.find("table", {"id": "sched_ks_9_2025"}) or soup.find("table", {"id": "sched_all"})
+    if not table:
+        print("⚠️ Could not find schedule table.")
+        return []
+
     links = []
-    for row in soup.select("table#sched_all tr"):
-        comp = row.select_one("td.competition")
-        if not comp or "Premier League" not in comp.text:
+    for row in table.find_all("tr"):
+        wk_cell = row.find("td", {"data-stat": "week"})
+        if not wk_cell:
             continue
-        match_link = row.find("a", string="Match Report")
-        if match_link:
-            links.append("https://fbref.com" + match_link["href"])
+        try:
+            week = int(wk_cell.text.strip())
+        except ValueError:
+            continue
+        if week == target_week:
+            match_link = row.find("a", string="Match Report")
+            if match_link:
+                href = match_link["href"]
+                links.append("https://fbref.com" + href)
+
+    print(f"Found {len(links)} match reports for Week {target_week}")
     return links
 
 def run_match(link, idx):
+    """Run scoring.py for a single match."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_file = os.path.join(OUTPUT_DIR, f"match_{idx}.csv")
     print(f"→ Running scoring.py for {link}")
@@ -52,39 +99,40 @@ def run_match(link, idx):
     return os.path.join(HFW_REPO, output_file)
 
 def combine_results(csv_paths, out_name):
-    dfs = [pd.read_csv(p) for p in csv_paths]
+    """Combine all match CSVs into a single file."""
+    dfs = [pd.read_csv(p) for p in csv_paths if os.path.exists(p)]
+    if not dfs:
+        print("⚠️ No CSVs found to combine.")
+        return None
     combined = pd.concat(dfs, ignore_index=True)
     combined.to_csv(out_name, index=False)
     return out_name
 
-if __name__ == "__main__":
-    today = date.today()
-    # get most recent Monday
-    
-    monday = today - timedelta(days=today.weekday())
-    week_dates = [monday - timedelta(days=i) for i in range(1, 8)]  # last 7 days
-    match_links = []
-    
-    for d in week_dates:
-        daily_links = get_premier_league_links(d)
-        if daily_links:
-            print(f"{d}: found {len(daily_links)} matches")
-            match_links += daily_links
+# --- MAIN WORKFLOW ---
 
-    print(f"\nTotal Premier League matches found: {len(match_links)}")
+if __name__ == "__main__":
+    target_week = get_latest_completed_week()
+    if not target_week:
+        print("⚠️ No completed matchweek detected. Exiting.")
+        raise SystemExit(0)
+
+    match_links = get_premier_league_links_by_week(target_week)
+
     if not match_links:
-        print("⚠️ No Premier League matches found — skipping CSV creation.")
-        import sys
-        sys.exit(0)
-        
+        print(f"⚠️ No Premier League matches found for Week {target_week}. Exiting.")
+        raise SystemExit(0)
+
     csvs = []
     for i, link in enumerate(match_links):
         print(f"Processing match {i+1}/{len(match_links)}: {link}")
         csv_path = run_match(link, i)
         csvs.append(csv_path)
-        
-    out_csv = os.path.join(os.getcwd(), f"Matchweek_{monday.strftime('%Y-%m-%d')}.csv")
-    print(f"Saving combined file to {out_csv}")
-    combine_results(csvs, out_csv)
 
-    print(f"✅ All done. Combined results → {out_csv}")
+    out_csv = os.path.join(os.getcwd(), f"Matchweek_{target_week}.csv")
+    print(f"Saving combined file to {out_csv}")
+    combined = combine_results(csvs, out_csv)
+
+    if combined:
+        print(f"✅ All done. Combined results → {out_csv}")
+    else:
+        print("⚠️ No combined file created.")
