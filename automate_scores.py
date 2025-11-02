@@ -13,7 +13,7 @@ OUTPUT_DIR = "weekly_scores"
 def fetch_html(url):
     """Fetch page content using Cloudscraper to bypass Cloudflare."""
     scraper = cloudscraper.create_scraper(
-        browser={"browser": "chrome", "platform": "macos", "mobile": False}
+        browser={"browser": "chrome", "platform": "darwin", "mobile": False}
     )
     print(f"Fetching schedule page from {url}")
     resp = scraper.get(url)
