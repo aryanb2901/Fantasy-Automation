@@ -17,7 +17,7 @@ jobs:
       # Step 2 — Clone your fork of the scoring app
       # ⚠️ Replace <your-username> below with your actual GitHub username
       - name: Clone HFW-App fork
-        run: git clone https://github.com/<your-username>/HFW-App.git
+        run: git clone https://github.com/aryanb2901/HFW-App.git
 
       # Step 3 — Install Python
       - name: Set up Python
