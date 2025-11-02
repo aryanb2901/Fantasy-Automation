@@ -31,7 +31,14 @@ def get_latest_completed_week():
         return None
 
     soup = BeautifulSoup(html, "html.parser")
-    table = soup.find("table", {"id": "sched_ks_9_2025"}) or soup.find("table", {"id": "sched_all"})
+    # Find the Premier League schedule table dynamically
+    table = None
+    for t in soup.find_all("table"):
+        caption = t.find("caption")
+        if caption and "Premier League Scores & Fixtures" in caption.text:
+            table = t
+            break
+
     if not table:
         print("⚠️ Could not find schedule table.")
         return None
