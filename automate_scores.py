@@ -1,4 +1,4 @@
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 import pandas as pd
 import subprocess
@@ -9,25 +9,28 @@ FBREF_URL = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fix
 HFW_REPO = "HFW-App"      # folder name after cloning your fork
 OUTPUT_DIR = "weekly_scores"
 
-# --- CORE FUNCTIONS ---
+# --- FETCH FUNCTION ---
+def fetch_html(url):
+    """Fetch page content using Cloudscraper to bypass Cloudflare."""
+    scraper = cloudscraper.create_scraper(
+        browser={"browser": "chrome", "platform": "macos", "mobile": False}
+    )
+    print(f"Fetching schedule page from {url}")
+    resp = scraper.get(url)
+    print(f"Status Code: {resp.status_code}")
+    if resp.status_code != 200:
+        print(f"⚠️ Failed to load {url}, status {resp.status_code}")
+        return None
+    return resp.text
 
+# --- CORE FUNCTIONS ---
 def get_latest_completed_week():
     """Return the most recent completed Premier League matchweek number."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/118.0.0.0 Safari/537.36"
-        )
-    }
-
-    print(f"Fetching schedule page from {FBREF_URL}")
-    resp = requests.get(FBREF_URL, headers=headers)
-    if resp.status_code != 200:
-        print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
+    html = fetch_html(FBREF_URL)
+    if not html:
         return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", {"id": "sched_ks_9_2025"}) or soup.find("table", {"id": "sched_all"})
     if not table:
         print("⚠️ Could not find schedule table.")
@@ -50,20 +53,11 @@ def get_latest_completed_week():
 
 def get_premier_league_links_by_week(target_week):
     """Return all Match Report links for a specific Premier League week."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/118.0.0.0 Safari/537.36"
-        )
-    }
-
-    resp = requests.get(FBREF_URL, headers=headers)
-    if resp.status_code != 200:
-        print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
+    html = fetch_html(FBREF_URL)
+    if not html:
         return []
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", {"id": "sched_ks_9_2025"}) or soup.find("table", {"id": "sched_all"})
     if not table:
         print("⚠️ Could not find schedule table.")
@@ -110,7 +104,6 @@ def combine_results(csv_paths, out_name):
     combined = pd.concat(dfs, ignore_index=True)
     combined.to_csv(out_name, index=False)
     return out_name
-
 
 # --- MAIN WORKFLOW ---
 if __name__ == "__main__":
