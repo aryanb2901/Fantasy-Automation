@@ -26,7 +26,7 @@ jobs:
         run: python3 --version
 
       - name: Install dependencies
-        run: pip3 install requests beautifulsoup4 pandas
+        run: pip3 install requests beautifulsoup4 pandas cloudscraper
 
       - name: Run automation
         run: python3 automate_scores.py || true
