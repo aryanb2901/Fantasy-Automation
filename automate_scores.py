@@ -3,27 +3,28 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import subprocess
 import os
-from datetime import date
-from datetime import timedelta
 
 # --- CONFIGURATION ---
 FBREF_URL = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
 HFW_REPO = "HFW-App"      # folder name after cloning your fork
 OUTPUT_DIR = "weekly_scores"
 
-# --- UTILITY FUNCTIONS ---
+# --- ABSTRACT API FETCH FUNCTION ---
+def fetch_via_abstractapi(url):
+    """Fetch URL content using AbstractAPI to bypass Cloudflare blocking."""
+    api_key = os.getenv("ABSTRACT_API_KEY")
+    if not api_key:
+        raise ValueError("ABSTRACT_API_KEY not set in environment variables.")
+    proxy_url = f"https://scrape.abstractapi.com/v1/?api_key={api_key}&url={url}"
+    print(f"Fetching via AbstractAPI: {url}")
+    resp = requests.get(proxy_url)
+    print(f"Status Code: {resp.status_code}")
+    return resp
 
+# --- CORE FUNCTIONS ---
 def get_latest_completed_week():
     """Return the most recent completed Premier League matchweek number."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/118.0.0.0 Safari/537.36"
-        )
-    }
-    print(f"Fetching schedule page from {FBREF_URL}")
-    resp = requests.get(FBREF_URL, headers=headers)
+    resp = fetch_via_abstractapi(FBREF_URL)
     if resp.status_code != 200:
         print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
         return None
@@ -50,14 +51,7 @@ def get_latest_completed_week():
 
 def get_premier_league_links_by_week(target_week):
     """Return all Match Report links for a specific Premier League week."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/118.0.0.0 Safari/537.36"
-        )
-    }
-    resp = requests.get(FBREF_URL, headers=headers)
+    resp = fetch_via_abstractapi(FBREF_URL)
     if resp.status_code != 200:
         print(f"⚠️ Failed to load schedule page, status {resp.status_code}")
         return []
@@ -109,7 +103,6 @@ def combine_results(csv_paths, out_name):
     return out_name
 
 # --- MAIN WORKFLOW ---
-
 if __name__ == "__main__":
     target_week = get_latest_completed_week()
     if not target_week:
@@ -117,7 +110,6 @@ if __name__ == "__main__":
         raise SystemExit(0)
 
     match_links = get_premier_league_links_by_week(target_week)
-
     if not match_links:
         print(f"⚠️ No Premier League matches found for Week {target_week}. Exiting.")
         raise SystemExit(0)
