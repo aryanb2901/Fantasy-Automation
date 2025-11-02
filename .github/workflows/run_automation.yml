@@ -21,18 +21,15 @@ jobs:
       - name: Clone HFW-App fork
         run: git clone https://github.com/aryanb2901/HFW-App.git
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
+      # ✅ Use the Python you already installed on macOS
+      - name: Verify local Python
+        run: python3 --version
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 pandas
+        run: pip3 install requests beautifulsoup4 pandas
 
       - name: Run automation
-        env:
-          ABSTRACT_API_KEY: ${{ secrets.ABSTRACT_API_KEY }}
-        run: python automate_scores.py || true
+        run: python3 automate_scores.py || true
 
       - name: Commit and push results
         env:
