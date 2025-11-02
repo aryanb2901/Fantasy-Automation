@@ -27,6 +27,10 @@ def fetch_html(url):
 def get_latest_completed_week():
     """Return the most recent completed Premier League matchweek number."""
     html = fetch_html(FBREF_URL)
+    # --- DEBUGGING ---
+    with open("debug_fbref.html", "w", encoding="utf-8") as f:
+        f.write(html)
+    print("✅ Saved fetched HTML to debug_fbref.html")
     if not html:
         return None
 
