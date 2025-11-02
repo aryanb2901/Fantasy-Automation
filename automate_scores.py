@@ -17,7 +17,14 @@ def get_last_saturday():
 def get_premier_league_links(fbref_date):
     url = f"{FBREF_BASE}/{fbref_date.strftime('%Y-%m-%d')}"
     print(f"Fetching matches from {url}")
-    resp = requests.get(url)
+    headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/118.0.0.0 Safari/537.36"
+        )
+    }
+    resp = requests.get(url, headers=headers)
     if resp.status_code != 200:
         print(f"⚠️ Failed to load page for {fbref_date}, status {resp.status_code}")
         return []
@@ -51,26 +58,33 @@ def combine_results(csv_paths, out_name):
     return out_name
 
 if __name__ == "__main__":
-    saturday = get_last_saturday()
-    sunday = saturday + timedelta(days=1)
+    today = date.today()
+    # get most recent Monday
+    
+    monday = today - timedelta(days=today.weekday())
+    week_dates = [monday - timedelta(days=i) for i in range(1, 8)]  # last 7 days
+    match_links = []
+    
+    for d in week_dates:
+        daily_links = get_premier_league_links(d)
+        if daily_links:
+            print(f"{d}: found {len(daily_links)} matches")
+            match_links += daily_links
 
-    # Collect Saturday + Sunday matches
-    match_links = get_premier_league_links(saturday)
-    match_links += get_premier_league_links(sunday)
-
-    print(f"\nFound {len(match_links)} Premier League matches")
-
+    print(f"\nTotal Premier League matches found: {len(match_links)}")
     if not match_links:
         print("⚠️ No Premier League matches found — skipping CSV creation.")
-        exit(0)
-
+        import sys
+        sys.exit(0)
+        
     csvs = []
     for i, link in enumerate(match_links):
         print(f"Processing match {i+1}/{len(match_links)}: {link}")
         csv_path = run_match(link, i)
         csvs.append(csv_path)
-
-    out_csv = f"Matchweek_{saturday.strftime('%Y-%m-%d')}.csv"
+        
+    out_csv = os.path.join(os.getcwd(), f"Matchweek_{monday.strftime('%Y-%m-%d')}.csv")
+    print(f"Saving combined file to {out_csv}")
     combine_results(csvs, out_csv)
 
     print(f"✅ All done. Combined results → {out_csv}")
