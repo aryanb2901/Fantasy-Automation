@@ -28,7 +28,10 @@ jobs:
       - name: Install dependencies
         run: pip3 install requests beautifulsoup4 pandas cloudscraper
 
+      # ✅ Pass AbstractAPI key as an environment variable
       - name: Run automation
+        env:
+          ABSTRACTAPI_KEY: ${{ secrets.ABSTRACTAPI_KEY }}
         run: python3 automate_scores.py || true
 
       - name: Commit and push results
