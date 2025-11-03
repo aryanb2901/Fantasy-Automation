@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import subprocess
 import os
+import random, time
 
 # --- CONFIGURATION ---
 FBREF_URL = "https://fbref.com/en/comps/9/schedule/Premier-League-Scores-and-Fixtures"
@@ -11,12 +12,18 @@ OUTPUT_DIR = "weekly_scores"
 
 # --- FETCH FUNCTION ---
 def fetch_html(url):
-    """Fetch page content using Cloudscraper to bypass Cloudflare."""
+    ua_list = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/119.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) Firefox/118.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/117.0"
+    ]
+    headers = {"User-Agent": random.choice(ua_list)}
     scraper = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "darwin", "mobile": False}
     )
-    print(f"Fetching schedule page from {url}")
-    resp = scraper.get(url)
+    time.sleep(random.uniform(3, 7))  # random delay
+    resp = scraper.get(url, headers=headers)
     print(f"Status Code: {resp.status_code}")
     if resp.status_code != 200:
         print(f"⚠️ Failed to load {url}, status {resp.status_code}")
