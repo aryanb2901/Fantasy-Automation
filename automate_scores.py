@@ -23,28 +23,30 @@ def fetch_html(url):
         return None
     return resp.text
 
+
 # --- CORE FUNCTIONS ---
 def get_latest_completed_week():
     """Return the most recent completed Premier League matchweek number."""
     html = fetch_html(FBREF_URL)
-    # --- DEBUGGING ---
-    with open("debug_fbref.html", "w", encoding="utf-8") as f:
-        f.write(html)
-    print("✅ Saved fetched HTML to debug_fbref.html")
     if not html:
         return None
 
-    soup = BeautifulSoup(html, "html.parser")
-    # Find the Premier League schedule table dynamically
-    table = None
-    for t in soup.find_all("table"):
-        caption = t.find("caption")
-        if caption and "Premier League Scores & Fixtures" in caption.text:
-            table = t
-            break
+    # Save fetched HTML for debugging (optional)
+    with open("debug_fbref.html", "w", encoding="utf-8") as f:
+        f.write(html)
+    print("✅ Saved fetched HTML to debug_fbref.html")
 
+    soup = BeautifulSoup(html, "html.parser")
+
+    # ✅ Find the div that contains the Premier League schedule table dynamically
+    div_container = soup.find("div", id=lambda x: x and x.startswith("div_sched_") and "_9_" in x)
+    if not div_container:
+        print("⚠️ Could not find Premier League schedule div.")
+        return None
+
+    table = div_container.find("table")
     if not table:
-        print("⚠️ Could not find schedule table.")
+        print("⚠️ Could not find schedule table inside the div.")
         return None
 
     weeks = set()
@@ -69,16 +71,16 @@ def get_premier_league_links_by_week(target_week):
         return []
 
     soup = BeautifulSoup(html, "html.parser")
-    # Find the Premier League schedule table dynamically
-    table = None
-    for t in soup.find_all("table"):
-        caption = t.find("caption")
-        if caption and "Premier League Scores & Fixtures" in caption.text:
-            table = t
-            break
 
+    # ✅ Find the div that contains the Premier League schedule table dynamically
+    div_container = soup.find("div", id=lambda x: x and x.startswith("div_sched_") and "_9_" in x)
+    if not div_container:
+        print("⚠️ Could not find Premier League schedule div.")
+        return []
+
+    table = div_container.find("table")
     if not table:
-        print("⚠️ Could not find schedule table.")
+        print("⚠️ Could not find schedule table inside the div.")
         return []
 
     links = []
@@ -122,6 +124,7 @@ def combine_results(csv_paths, out_name):
     combined = pd.concat(dfs, ignore_index=True)
     combined.to_csv(out_name, index=False)
     return out_name
+
 
 # --- MAIN WORKFLOW ---
 if __name__ == "__main__":
